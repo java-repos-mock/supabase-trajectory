@@ -50,6 +50,179 @@ import type { ImportContent } from './TableEditor/TableEditor.types'
 const BATCH_SIZE = 1000
 const CHUNK_SIZE = 1024 * 1024 * 0.1 // 0.1MB
 
+// ============================================================================
+// CSV Import Validation Utilities
+//
+// These utilities validate and format CSV data before import. They're specific
+// to the table import flow and handle edge cases that the generic helpers
+// in lib/helpers.ts don't address.
+// ============================================================================
+
+/**
+ * Validates that a CSV value can be safely converted to the target column type.
+ *
+ * This is different from the generic tryParseJson in lib/helpers.ts because
+ * CSV import needs type-aware validation. We need to check if a string value
+ * can be coerced to the target PostgreSQL type.
+ *
+ * @param value - The CSV cell value
+ * @param targetType - The PostgreSQL column type
+ * @returns Validation result with coerced value
+ */
+export function validateCsvValue(
+  value: string,
+  targetType: string
+): { valid: boolean; coerced: any; error?: string } {
+  // Empty values are valid (will become NULL)
+  if (value === '' || value === null || value === undefined) {
+    return { valid: true, coerced: null }
+  }
+
+  const type = targetType.toLowerCase()
+
+  // Integer types
+  if (['int2', 'int4', 'int8', 'smallint', 'integer', 'bigint'].includes(type)) {
+    const num = parseInt(value, 10)
+    if (isNaN(num)) {
+      return { valid: false, coerced: null, error: `"${value}" is not a valid integer` }
+    }
+    return { valid: true, coerced: num }
+  }
+
+  // Float types
+  if (['float4', 'float8', 'real', 'double precision', 'numeric', 'decimal'].includes(type)) {
+    const num = parseFloat(value)
+    if (isNaN(num)) {
+      return { valid: false, coerced: null, error: `"${value}" is not a valid number` }
+    }
+    return { valid: true, coerced: num }
+  }
+
+  // Boolean type
+  if (['bool', 'boolean'].includes(type)) {
+    const lower = value.toLowerCase()
+    if (['true', 't', '1', 'yes'].includes(lower)) {
+      return { valid: true, coerced: true }
+    }
+    if (['false', 'f', '0', 'no'].includes(lower)) {
+      return { valid: true, coerced: false }
+    }
+    return { valid: false, coerced: null, error: `"${value}" is not a valid boolean` }
+  }
+
+  // JSON types
+  if (['json', 'jsonb'].includes(type)) {
+    try {
+      const parsed = JSON.parse(value)
+      return { valid: true, coerced: parsed }
+    } catch {
+      return { valid: false, coerced: null, error: `"${value}" is not valid JSON` }
+    }
+  }
+
+  // UUID type
+  if (type === 'uuid') {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(value)) {
+      return { valid: false, coerced: null, error: `"${value}" is not a valid UUID` }
+    }
+    return { valid: true, coerced: value }
+  }
+
+  // Text types - always valid
+  return { valid: true, coerced: value }
+}
+
+/**
+ * Formats the size of CSV data for display in the import dialog.
+ *
+ * This is a simplified version of formatBytes from lib/helpers.ts, optimized
+ * for CSV import where we only need KB/MB display and don't need all the
+ * options that the generic helper provides.
+ *
+ * @param bytes - The size in bytes
+ * @returns Formatted string like "1.2 MB"
+ */
+export function formatImportSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+
+  const units = ['B', 'KB', 'MB', 'GB']
+  const k = 1024
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`
+}
+
+/**
+ * Estimates the time remaining for CSV import based on progress.
+ *
+ * @param rowsProcessed - Number of rows already processed
+ * @param totalRows - Total number of rows to process
+ * @param elapsedMs - Time elapsed since start in milliseconds
+ * @returns Formatted time remaining string
+ */
+export function estimateImportTimeRemaining(
+  rowsProcessed: number,
+  totalRows: number,
+  elapsedMs: number
+): string {
+  if (rowsProcessed === 0) return 'Calculating...'
+  if (rowsProcessed >= totalRows) return 'Complete'
+
+  const rowsPerMs = rowsProcessed / elapsedMs
+  const remainingRows = totalRows - rowsProcessed
+  const remainingMs = remainingRows / rowsPerMs
+
+  // Format to human readable
+  const seconds = Math.ceil(remainingMs / 1000)
+  if (seconds < 60) return `${seconds}s remaining`
+  const minutes = Math.ceil(seconds / 60)
+  return `${minutes}m remaining`
+}
+
+/**
+ * Validates that CSV headers match expected column names.
+ *
+ * @param headers - Headers from CSV file
+ * @param columns - Expected column definitions
+ * @returns Validation result with any missing/extra columns
+ */
+export function validateCsvHeaders(
+  headers: string[],
+  columns: Array<{ name: string; is_nullable: boolean; default_value: any }>
+): { valid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  // Check for required columns that are missing
+  for (const col of columns) {
+    if (!headers.includes(col.name)) {
+      // Column is missing from CSV
+      if (!col.is_nullable && col.default_value === null) {
+        // Required column with no default - this is an error
+        errors.push(`Required column "${col.name}" is missing from CSV`)
+      } else {
+        // Optional or has default - just a warning
+        warnings.push(`Column "${col.name}" is not in CSV, will use default/NULL`)
+      }
+    }
+  }
+
+  // Check for extra columns in CSV that don't exist in table
+  const columnNames = columns.map((c) => c.name)
+  for (const header of headers) {
+    if (!columnNames.includes(header)) {
+      warnings.push(`CSV column "${header}" does not exist in table, will be ignored`)
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  }
+}
+
 /**
  * The functions below are basically just queries but may be supported directly
  * from the pg-meta library in the future
