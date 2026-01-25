@@ -4,6 +4,37 @@ Tasks where Greptile missed meaningful bugs that require multi-hop reasoning or 
 
 ---
 
+## Summary by Integration Status
+
+### Integrated (Modify EXISTING Files) - STRONGEST TASKS
+
+| PR | File Modified | Pattern | Greptile Result |
+|----|---------------|---------|-----------------|
+| **#20** | `RolesList.tsx` | Security + Misleading | ❌ Missed permission bypass (gave 5/5) |
+| **#21** | `SQLEditor.utils.ts` | Code Duplication | ❌ Missed duplicate utilities |
+| **#26** | `execute-sql-mutation.ts` | Misleading Comments | ⚠️ Caught 4, missed 4 critical (projectRef) |
+| **#30** | `ColumnEditor.utils.ts` | Same Bug 4x | ⏳ Pending |
+
+### Standalone Files (NOT Integrated) - WEAKER TASKS
+
+| PR | New Files Created | Pattern | Notes |
+|----|-------------------|---------|-------|
+| #13 | `encoding-utils.ts` | Domain Knowledge | 4 encoding bugs missed |
+| #15 | `upload-utils.ts` | Edge Cases | NaN, naming mismatch |
+| #16 | `invitation-utils.ts` | Implicit Assumptions | WEAK - Greptile caught 10 |
+| #17 | `realtime-manager.ts`, `rate-limiter.ts` | Unicode/Contract | btoa crash, throttle undefined |
+| #18 | `connection-pool-config.ts` | Same Pattern | Caught 6543, missed 5432 |
+| #19 | `array-utils.ts` | Edge Cases | Infinity/-Infinity on empty |
+
+### Key Findings
+
+1. **Misleading Comments** work best - Greptile trusts plausible technical justifications
+2. **Multi-tenant bugs** are missed when comments explain "identical SQL = identical results"
+3. **Same bug multiple locations** - Greptile catches 1-2 but misses identical patterns elsewhere
+4. **Integrated PRs are stronger** - they test realistic code review scenarios
+
+---
+
 ## PR #18: Connection Pool Configuration Utilities
 
 **PR URL:** https://github.com/java-repos-mock/supabase-trajectory/pull/18
