@@ -302,3 +302,140 @@ export const getPlaceholderText = (format?: string, columnFieldName?: string) =>
       return `length("${columnName}") < 500`
   }
 }
+
+/**
+ * Type compatibility groups for column type changes.
+ * Types within the same group can be converted without data loss.
+ */
+const TYPE_GROUPS = {
+  numeric: ['int2', 'int4', 'int8', 'float4', 'float8', 'numeric', 'decimal'],
+  text: ['text', 'varchar', 'char', 'bpchar'],
+  temporal: ['date', 'time', 'timetz', 'timestamp', 'timestamptz'],
+  boolean: ['bool', 'boolean'],
+  json: ['json', 'jsonb'],
+  uuid: ['uuid'],
+}
+
+/**
+ * Checks if a column type change is safe (won't cause data loss).
+ * Safe changes are within the same type group or to a wider type.
+ */
+export function isTypeSafeChange(fromType: string, toType: string): boolean {
+  // Same type is always safe
+  if (fromType === toType) return true
+  
+  // Find which groups each type belongs to
+  const fromGroup = Object.entries(TYPE_GROUPS).find(([_, types]) => 
+    types.includes(fromType.toLowerCase())
+  )?.[0]
+  
+  const toGroup = Object.entries(TYPE_GROUPS).find(([_, types]) => 
+    types.includes(toType.toLowerCase())
+  )?.[0]
+  
+  // Types in the same group can be converted
+  if (fromGroup && toGroup && fromGroup === toGroup) {
+    return true
+  }
+  
+  // Text types can accept any type (widening)
+  if (toGroup === 'text') {
+    return true
+  }
+  
+  return false
+}
+
+/**
+ * Validates that a default value is compatible with the column type.
+ * Returns true if the value can be safely used as a default.
+ */
+export function isValidDefaultValue(value: string, columnType: string): boolean {
+  const type = columnType.toLowerCase()
+  
+  // Check numeric types
+  if (TYPE_GROUPS.numeric.includes(type)) {
+    const num = Number(value)
+    return !isNaN(num)
+  }
+  
+  // Check boolean types
+  if (TYPE_GROUPS.boolean.includes(type)) {
+    const lower = value.toLowerCase()
+    return ['true', 'false', '1', '0', 't', 'f'].includes(lower)
+  }
+  
+  // Check UUID format
+  if (TYPE_GROUPS.uuid.includes(type)) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(value)
+  }
+  
+  // Check JSON format
+  if (TYPE_GROUPS.json.includes(type)) {
+    try {
+      JSON.parse(value)
+      return true
+    } catch {
+      return false
+    }
+  }
+  
+  // Text types accept any value
+  if (TYPE_GROUPS.text.includes(type)) {
+    return true
+  }
+  
+  // Temporal types - basic validation
+  if (TYPE_GROUPS.temporal.includes(type)) {
+    const date = new Date(value)
+    return !isNaN(date.getTime())
+  }
+  
+  return true
+}
+
+/**
+ * Gets the appropriate SQL cast expression for type conversion.
+ */
+export function getTypeCastExpression(columnName: string, fromType: string, toType: string): string {
+  // Numeric to text - straightforward cast
+  if (TYPE_GROUPS.numeric.includes(fromType.toLowerCase()) && 
+      TYPE_GROUPS.text.includes(toType.toLowerCase())) {
+    return `${columnName}::${toType}`
+  }
+  
+  // Text to numeric - need to handle non-numeric values
+  if (TYPE_GROUPS.text.includes(fromType.toLowerCase()) && 
+      TYPE_GROUPS.numeric.includes(toType.toLowerCase())) {
+    return `${columnName}::${toType}`
+  }
+  
+  // JSON to text
+  if (TYPE_GROUPS.json.includes(fromType.toLowerCase()) && 
+      TYPE_GROUPS.text.includes(toType.toLowerCase())) {
+    return `${columnName}::${toType}`
+  }
+  
+  // Default cast
+  return `${columnName}::${toType}`
+}
+
+/**
+ * Checks if a column can have a default value of the specified type.
+ */
+export function canHaveDefault(columnType: string): boolean {
+  const type = columnType.toLowerCase()
+  
+  // Serial types have implicit defaults
+  if (type.includes('serial')) {
+    return false
+  }
+  
+  // Array types can have defaults
+  if (type.endsWith('[]')) {
+    return true
+  }
+  
+  return true
+}
