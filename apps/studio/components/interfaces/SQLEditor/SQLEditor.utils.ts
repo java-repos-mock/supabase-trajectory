@@ -151,3 +151,97 @@ export const suffixWithLimit = (sql: string, limit: number = 0) => {
     : sql
   return formattedSql
 }
+
+/**
+ * Format execution time in a human-readable format
+ * @param ms - Time in milliseconds
+ */
+export const formatExecutionTime = (ms: number): string => {
+  if (ms < 1000) {
+    return `${ms.toFixed(2)}ms`
+  } else if (ms < 60000) {
+    return `${(ms / 1000).toFixed(2)}s`
+  } else {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = ((ms % 60000) / 1000).toFixed(0)
+    return `${minutes}m ${seconds}s`
+  }
+}
+
+/**
+ * Format bytes for displaying query result size
+ * @param bytes - Size in bytes
+ */
+export const formatResultSize = (bytes: number): string => {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  } else if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  } else if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  } else {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
+}
+
+/**
+ * Query execution statistics
+ */
+export interface QueryStats {
+  executionTime: number
+  rowCount: number
+  resultSize: number
+}
+
+/**
+ * Format query statistics for display
+ */
+export const formatQueryStats = (stats: QueryStats): string => {
+  const time = formatExecutionTime(stats.executionTime)
+  const rows = stats.rowCount === 1 ? '1 row' : `${stats.rowCount} rows`
+  const size = formatResultSize(stats.resultSize)
+  return `${time} | ${rows} | ${size}`
+}
+
+/**
+ * Calculate estimated query complexity based on SQL structure
+ * Returns a score from 1-10
+ */
+export const estimateQueryComplexity = (sql: string): number => {
+  const cleanedSql = sql.toLowerCase()
+  let score = 1
+
+  // Joins increase complexity
+  const joinCount = (cleanedSql.match(/\bjoin\b/g) || []).length
+  score += joinCount * 2
+
+  // Subqueries increase complexity
+  const subqueryCount = (cleanedSql.match(/\(\s*select\b/g) || []).length
+  score += subqueryCount * 3
+
+  // Aggregations
+  if (/\b(count|sum|avg|min|max|group by)\b/.test(cleanedSql)) {
+    score += 2
+  }
+
+  // Window functions
+  if (/\bover\s*\(/i.test(cleanedSql)) {
+    score += 3
+  }
+
+  // CTEs
+  const cteCount = (cleanedSql.match(/\bwith\b/g) || []).length
+  score += cteCount * 2
+
+  return Math.min(score, 10)
+}
+
+/**
+ * Get complexity label based on score
+ */
+export const getComplexityLabel = (score: number): string => {
+  if (score <= 2) return 'Simple'
+  if (score <= 5) return 'Moderate'
+  if (score <= 7) return 'Complex'
+  return 'Very Complex'
+}
