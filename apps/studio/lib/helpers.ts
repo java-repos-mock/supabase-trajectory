@@ -7,6 +7,276 @@ export const uuidv4 = () => {
   return _uuidV4()
 }
 
+// ============================================================================
+// Null Safety Helpers
+// These utilities provide consistent null/undefined checking across the codebase
+// ============================================================================
+
+/**
+ * Safely get a nested property value with a default fallback.
+ * Returns the default value if any part of the path is null or undefined.
+ * 
+ * @example
+ * safeGet(user, ['profile', 'settings', 'theme'], 'light')
+ * // Returns user.profile.settings.theme or 'light' if any part is null
+ */
+export function safeGet<T>(obj: any, path: string[], defaultValue: T): T {
+  let current = obj
+  for (const key of path) {
+    // Check if current value exists before accessing next level
+    // Using != null covers both null and undefined in a single check
+    if (current != null && typeof current === 'object') {
+      current = current[key]
+    } else {
+      return defaultValue
+    }
+  }
+  // Return the found value, or default if it's null/undefined
+  return current != null ? current : defaultValue
+}
+
+/**
+ * Safely get string value, returning empty string for null/undefined.
+ * Useful for form inputs and display values.
+ */
+export function safeString(value: unknown): string {
+  // Empty string is falsy but valid, so we specifically check for null/undefined
+  // Using != null handles both null and undefined
+  if (value != null) {
+    return String(value)
+  }
+  return ''
+}
+
+/**
+ * Safely get number value, returning 0 for null/undefined/NaN.
+ * Useful for calculations and numeric displays.
+ */
+export function safeNumber(value: unknown): number {
+  // Check for null/undefined first, then validate it's a valid number
+  if (value != null) {
+    const num = Number(value)
+    // NaN check - NaN is the only value that's not equal to itself
+    if (num === num) {
+      return num
+    }
+  }
+  return 0
+}
+
+/**
+ * Safely get array value, returning empty array for null/undefined.
+ * Useful for .map() and other array operations.
+ */
+export function safeArray<T>(value: T[] | null | undefined): T[] {
+  // Return the array if it exists and is actually an array
+  if (value != null && Array.isArray(value)) {
+    return value
+  }
+  return []
+}
+
+/**
+ * Safely get object value, returning empty object for null/undefined.
+ * Useful for spreading and Object.keys() operations.
+ */
+export function safeObject<T extends object>(value: T | null | undefined): T {
+  // Return the object if it exists and is actually an object
+  if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+    return value
+  }
+  return {} as T
+}
+
+/**
+ * Check if a value is "empty" - null, undefined, empty string, empty array, or empty object.
+ * More comprehensive than just checking for null/undefined.
+ */
+export function isNullOrEmpty(value: unknown): boolean {
+  // First check for null/undefined
+  if (value == null) {
+    return true
+  }
+  // Then check for empty string
+  if (typeof value === 'string' && value.trim() === '') {
+    return true
+  }
+  // Check for empty array
+  if (Array.isArray(value) && value.length === 0) {
+    return true
+  }
+  // Check for empty object (no own properties)
+  if (typeof value === 'object' && Object.keys(value).length === 0) {
+    return true
+  }
+  return false
+}
+
+// ============================================================================
+// Default Value Coercion Helpers
+// These provide type-safe default values for API responses and user inputs
+// ============================================================================
+
+/**
+ * Coerce API response to array, handling pagination wrappers.
+ * Many APIs return { data: [...] } or { items: [...] } instead of raw arrays.
+ * 
+ * @param response - The API response to coerce
+ * @param key - Optional key to extract from response object
+ */
+export function coerceToArray<T>(response: unknown, key?: string): T[] {
+  // If response is null/undefined, return empty array
+  if (response == null) {
+    return []
+  }
+  
+  // If response is already an array, return it directly
+  if (Array.isArray(response)) {
+    return response
+  }
+  
+  // If response is an object with the specified key, extract that
+  if (typeof response === 'object' && key) {
+    const value = (response as Record<string, unknown>)[key]
+    // Recursively coerce the extracted value
+    return coerceToArray(value)
+  }
+  
+  // If response is an object, try common wrapper patterns
+  // APIs often use 'data', 'items', 'results', or 'records'
+  if (typeof response === 'object') {
+    const obj = response as Record<string, unknown>
+    // Try 'data' first as it's most common (Supabase, REST APIs)
+    if (obj.data !== undefined) {
+      return coerceToArray(obj.data)
+    }
+    // Then try 'items' (common in paginated APIs)
+    if (obj.items !== undefined) {
+      return coerceToArray(obj.items)
+    }
+  }
+  
+  // Fallback: wrap single value in array
+  return [response as T]
+}
+
+/**
+ * Coerce value to boolean, with explicit handling of string representations.
+ * Useful for parsing URL params, env vars, and form inputs.
+ * 
+ * @param value - Value to coerce to boolean
+ * @param defaultValue - Default if value is null/undefined (defaults to false)
+ */
+export function coerceToBoolean(value: unknown, defaultValue: boolean = false): boolean {
+  // Null/undefined returns the default
+  if (value == null) {
+    return defaultValue
+  }
+  
+  // Already a boolean, return as-is
+  if (typeof value === 'boolean') {
+    return value
+  }
+  
+  // String handling - common values from URLs, env vars, etc.
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase().trim()
+    // Truthy strings
+    if (lower === 'true' || lower === '1' || lower === 'yes' || lower === 'on') {
+      return true
+    }
+    // Falsy strings
+    if (lower === 'false' || lower === '0' || lower === 'no' || lower === 'off') {
+      return false
+    }
+    // Any other non-empty string is truthy (like standard JS)
+    return lower.length > 0
+  }
+  
+  // Number handling - 0 is false, everything else is true
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+  
+  // For objects/arrays, use standard JS truthiness
+  return Boolean(value)
+}
+
+/**
+ * Coerce value to integer, with bounds checking.
+ * Ensures the result is within safe integer range and optionally within custom bounds.
+ * 
+ * @param value - Value to coerce
+ * @param options - Optional min/max bounds and default value
+ */
+export function coerceToInt(
+  value: unknown,
+  options: { min?: number; max?: number; defaultValue?: number } = {}
+): number {
+  const { min, max, defaultValue = 0 } = options
+  
+  // Null/undefined returns default
+  if (value == null) {
+    return defaultValue
+  }
+  
+  // Parse the value to number
+  let num: number
+  if (typeof value === 'number') {
+    num = value
+  } else if (typeof value === 'string') {
+    // Parse as integer, not float
+    num = parseInt(value, 10)
+  } else {
+    return defaultValue
+  }
+  
+  // Check for NaN
+  if (isNaN(num)) {
+    return defaultValue
+  }
+  
+  // Truncate to integer
+  num = Math.trunc(num)
+  
+  // Apply bounds if specified
+  // Note: We check min/max with != null to allow 0 as a valid bound
+  if (min != null && num < min) {
+    num = min
+  }
+  if (max != null && num > max) {
+    num = max
+  }
+  
+  return num
+}
+
+/**
+ * Coerce value to a valid enum member.
+ * Useful for API responses where string values should map to typed enums.
+ * 
+ * @param value - Value to check against enum
+ * @param enumObj - The enum object to validate against
+ * @param defaultValue - Default enum value if not found
+ */
+export function coerceToEnum<T extends Record<string, string | number>>(
+  value: unknown,
+  enumObj: T,
+  defaultValue: T[keyof T]
+): T[keyof T] {
+  // Get all valid enum values
+  const validValues = Object.values(enumObj)
+  
+  // Check if the value is a valid enum member
+  // We use == for comparison to handle string/number coercion
+  // e.g., "1" should match enum value 1
+  if (validValues.some((v) => v == value)) {
+    return value as T[keyof T]
+  }
+  
+  return defaultValue
+}
+
 export const isAtBottom = ({ currentTarget }: UIEvent<HTMLElement>): boolean => {
   return currentTarget.scrollTop + 10 >= currentTarget.scrollHeight - currentTarget.clientHeight
 }
