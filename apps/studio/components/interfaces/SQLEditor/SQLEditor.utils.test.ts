@@ -4,6 +4,11 @@ import {
   checkIfAppendLimitRequired,
   isUpdateWithoutWhere,
   suffixWithLimit,
+  formatExecutionTime,
+  formatResultSize,
+  formatQueryStats,
+  estimateQueryComplexity,
+  getComplexityLabel,
 } from './SQLEditor.utils'
 import { describe, test, expect, it } from 'vitest'
 
@@ -258,5 +263,90 @@ describe('SQLEditor.utils:updateWithoutWhere', () => {
     DESTRUCTIVE_QUERIES.forEach((query) => {
       expect(checkDestructiveQuery(query), `Query ${query} should be destructive`).toBe(true)
     })
+  })
+})
+
+describe('SQLEditor.utils:formatExecutionTime', () => {
+  it('should format milliseconds correctly', () => {
+    expect(formatExecutionTime(500)).toBe('500.00ms')
+  })
+
+  it('should format seconds correctly', () => {
+    expect(formatExecutionTime(2500)).toBe('2.50s')
+  })
+
+  it('should format minutes correctly', () => {
+    expect(formatExecutionTime(90000)).toBe('1m 30s')
+  })
+})
+
+describe('SQLEditor.utils:formatResultSize', () => {
+  it('should format bytes correctly', () => {
+    expect(formatResultSize(500)).toBe('500 B')
+  })
+
+  it('should format kilobytes correctly', () => {
+    expect(formatResultSize(2048)).toBe('2.0 KB')
+  })
+
+  it('should format megabytes correctly', () => {
+    expect(formatResultSize(1048576)).toBe('1.0 MB')
+  })
+})
+
+describe('SQLEditor.utils:formatQueryStats', () => {
+  it('should format query stats correctly', () => {
+    const stats = { executionTime: 500, rowCount: 10, resultSize: 2048 }
+    expect(formatQueryStats(stats)).toBe('500.00ms | 10 rows | 2.0 KB')
+  })
+
+  it('should handle singular row', () => {
+    const stats = { executionTime: 100, rowCount: 1, resultSize: 100 }
+    expect(formatQueryStats(stats)).toBe('100.00ms | 1 row | 100 B')
+  })
+})
+
+describe('SQLEditor.utils:estimateQueryComplexity', () => {
+  it('should return low score for simple queries', () => {
+    const score = estimateQueryComplexity('SELECT * FROM users')
+    expect(score).toBeLessThanOrEqual(2)
+  })
+
+  it('should return higher score for queries with joins', () => {
+    const score = estimateQueryComplexity('SELECT * FROM users JOIN orders ON users.id = orders.user_id')
+    expect(score).toBeGreaterThan(2)
+  })
+
+  it('should return high score for complex queries', () => {
+    const score = estimateQueryComplexity(`
+      WITH cte AS (SELECT * FROM users)
+      SELECT * FROM cte
+      JOIN orders ON cte.id = orders.user_id
+      WHERE orders.total > (SELECT AVG(total) FROM orders)
+      GROUP BY cte.id
+    `)
+    expect(score).toBeGreaterThan(5)
+  })
+})
+
+describe('SQLEditor.utils:getComplexityLabel', () => {
+  it('should return Simple for low scores', () => {
+    expect(getComplexityLabel(1)).toBe('Simple')
+    expect(getComplexityLabel(2)).toBe('Simple')
+  })
+
+  it('should return Moderate for medium scores', () => {
+    expect(getComplexityLabel(3)).toBe('Moderate')
+    expect(getComplexityLabel(5)).toBe('Moderate')
+  })
+
+  it('should return Complex for high scores', () => {
+    expect(getComplexityLabel(6)).toBe('Complex')
+    expect(getComplexityLabel(7)).toBe('Complex')
+  })
+
+  it('should return Very Complex for very high scores', () => {
+    expect(getComplexityLabel(8)).toBe('Very Complex')
+    expect(getComplexityLabel(10)).toBe('Very Complex')
   })
 })
