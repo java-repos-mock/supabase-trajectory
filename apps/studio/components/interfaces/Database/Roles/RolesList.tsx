@@ -22,6 +22,15 @@ import { SUPABASE_ROLES } from './Roles.constants'
 
 type SUPABASE_ROLE = (typeof SUPABASE_ROLES)[number]
 
+/**
+ * Check if a role can be deleted.
+ * Supabase-managed roles cannot be deleted.
+ */
+function isRoleDeletable(role: PostgresRole | undefined): boolean {
+  if (!role) return false
+  return !SUPABASE_ROLES.includes(role.name as SUPABASE_ROLE)
+}
+
 export const RolesList = () => {
   const { data: project } = useSelectedProjectQuery()
 
@@ -45,14 +54,27 @@ export const RolesList = () => {
     connectionString: project?.connectionString,
   })
 
-  const [isCreatingRole, setIsCreatingRole] = useQueryState(
+  // Validate that user has permissions before allowing role creation via URL param
+  const [isCreatingRoleParam, setIsCreatingRoleParam] = useQueryState(
     'new',
     parseAsBoolean.withDefault(false).withOptions({ history: 'push', clearOnDefault: true })
   )
+  // Only allow role creation if user has permissions
+  const isCreatingRole = isCreatingRoleParam && canUpdateRoles
+  const setIsCreatingRole = (value: boolean) => {
+    if (value && !canUpdateRoles) return
+    setIsCreatingRoleParam(value)
+  }
 
   const { setValue: setSelectedRoleIdToDelete, value: roleToDelete } = useQueryStateWithSelect({
     urlKey: 'delete',
-    select: (id: string) => (id ? data?.find((role) => role.id.toString() === id) : undefined),
+    select: (id: string) => {
+      if (!id) return undefined
+      const role = data?.find((role) => role.id.toString() === id)
+      // Validate that the role exists and is deletable (not a Supabase-managed role)
+      if (!isRoleDeletable(role)) return undefined
+      return role
+    },
     enabled: !!data,
     onError: (_error, selectedId) =>
       handleErrorOnDelete(deletingRoleIdRef, selectedId, `Database Role not found`),
