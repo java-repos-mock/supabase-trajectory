@@ -756,3 +756,67 @@ export function role(metadata: any) {
 
   return payload.role
 }
+
+/**
+ * Formats bytes into human-readable string for log size display.
+ * Used in log explorer to show request/response payload sizes.
+ */
+export function formatLogBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  
+  const units = ['B', 'KB', 'MB', 'GB']
+  const k = 1024
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`
+}
+
+/**
+ * Formats milliseconds into human-readable duration for log timing display.
+ * Shows appropriate units based on magnitude (ms, s, m, h).
+ */
+export function formatLogDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms.toFixed(0)}ms`
+  } else if (ms < 60000) {
+    return `${(ms / 1000).toFixed(2)}s`
+  } else if (ms < 3600000) {
+    const minutes = Math.floor(ms / 60000)
+    const seconds = Math.floor((ms % 60000) / 1000)
+    return `${minutes}m ${seconds}s`
+  } else {
+    const hours = Math.floor(ms / 3600000)
+    const minutes = Math.floor((ms % 3600000) / 60000)
+    return `${hours}h ${minutes}m`
+  }
+}
+
+/**
+ * Formats a timestamp for display in log entries.
+ * Uses local timezone for user convenience.
+ */
+export function formatLogTimestamp(timestamp: string | number): string {
+  const date = typeof timestamp === 'number' 
+    ? new Date(timestamp)
+    : new Date(timestamp)
+  
+  return date.toLocaleString()
+}
+
+/**
+ * Formats request/response status code with appropriate styling hint.
+ * Returns an object with formatted code and severity level.
+ */
+export function formatStatusCode(statusCode: number): { text: string; severity: 'success' | 'warning' | 'error' } {
+  const text = String(statusCode)
+  
+  if (statusCode >= 200 && statusCode < 300) {
+    return { text, severity: 'success' }
+  } else if (statusCode >= 400 && statusCode < 500) {
+    return { text, severity: 'warning' }
+  } else if (statusCode >= 500) {
+    return { text, severity: 'error' }
+  }
+  
+  return { text, severity: 'success' }
+}
