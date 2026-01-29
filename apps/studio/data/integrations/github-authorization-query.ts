@@ -4,7 +4,11 @@ import { get } from 'data/fetchers'
 import type { ResponseError, UseCustomQueryOptions } from 'types'
 import { integrationKeys } from './keys'
 
-// FIXME(kamil): Do not retry, a single check is fine.
+/**
+ * Fetches GitHub authorization status for the current user.
+ * This is a simple check that doesn't need retries - the user either
+ * has authorized GitHub integration or they haven't.
+ */
 export async function getGitHubAuthorization(signal?: AbortSignal) {
   const { data, error } = await get('/platform/integrations/github/authorization', {
     signal,
@@ -26,7 +30,10 @@ export const useGitHubAuthorizationQuery = <TData = GitHubAuthorizationData>({
     queryKey: integrationKeys.githubAuthorization(),
     queryFn: ({ signal }) => getGitHubAuthorization(signal),
     enabled,
-    staleTime: 0,
+    // Don't retry - authorization status is a simple check
+    retry: false,
+    // Cache authorization status to reduce API calls
+    staleTime: 1000 * 60 * 30,
     ...options,
   })
 }
