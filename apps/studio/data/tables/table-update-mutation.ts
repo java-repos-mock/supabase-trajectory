@@ -60,6 +60,29 @@ export const useTableUpdateMutation = ({
 
   return useMutation<TableUpdateData, ResponseError, TableUpdateVariables>({
     mutationFn: (vars) => updateTable(vars),
+    async onMutate(variables) {
+      const { projectRef, schema, id, payload } = variables
+      
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: tableKeys.list(projectRef, schema) })
+      
+      // Snapshot current state for rollback
+      const previousTables = queryClient.getQueryData(tableKeys.list(projectRef, schema))
+      
+      // Optimistically update the cache
+      // This provides immediate UI feedback while the server processes the request
+      queryClient.setQueryData(tableKeys.list(projectRef, schema), (old: any[] | undefined) => {
+        if (!old) return old
+        return old.map(table => 
+          table.id === id 
+            ? { ...table, ...payload }
+            : table
+        )
+      })
+      
+      // Return context with previous state for rollback
+      return { previousTables, projectRef, schema }
+    },
     async onSuccess(data, variables, context) {
       const { projectRef, schema, id } = variables
       await Promise.all([
@@ -70,6 +93,16 @@ export const useTableUpdateMutation = ({
       await onSuccess?.(data, variables, context)
     },
     async onError(data, variables, context) {
+      // Rollback optimistic update on error
+      // Note: We restore from context which was captured at mutation start
+      // This is safe because invalidation only happens on success
+      if (context?.previousTables) {
+        queryClient.setQueryData(
+          tableKeys.list(context.projectRef, context.schema),
+          context.previousTables
+        )
+      }
+      
       if (onError === undefined) {
         toast.error(`Failed to update database table: ${data.message}`)
       } else {
