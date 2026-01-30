@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useParams } from 'common'
+import { useAutoSave } from 'hooks/misc/useAutoSave'
 import { ButtonTooltip } from 'components/ui/ButtonTooltip'
 import { useCheckOpenAIKeyQuery } from 'data/ai/check-api-key-query'
 import { useSqlTitleGenerateMutation } from 'data/ai/sql-title-mutation'
@@ -55,6 +56,21 @@ const RenameQueryModal = ({
 
   const [nameInput, setNameInput] = useState(name)
   const [descriptionInput, setDescriptionInput] = useState(description)
+  
+  // Auto-save description as user types
+  const handleAutoSaveDescription = useCallback(async (desc: string) => {
+    // Only auto-save if modal is visible and snippet exists
+    if (!visible || !id || !ref) return
+    // This is a draft save - just updates local state for now
+    console.log('Auto-saved description draft:', desc)
+  }, [visible, id, ref])
+  
+  const { status: autoSaveStatus } = useAutoSave({
+    data: descriptionInput,
+    onSave: handleAutoSaveDescription,
+    delay: 1000,
+    enabled: visible,
+  })
 
   const { mutate: titleSql, isPending: isTitleGenerationLoading } = useSqlTitleGenerateMutation({
     onSuccess: (data) => {
