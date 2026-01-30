@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { IS_PLATFORM, LOCAL_STORAGE_KEYS, useFlag, useParams } from 'common'
+import { useKeyboardShortcuts } from 'hooks/misc/useKeyboardShortcuts'
 import {
   isExplainQuery,
   isExplainSql,
@@ -100,6 +101,20 @@ export const SQLEditor = () => {
   const databaseSelectorState = useDatabaseSelectorStateSnapshot()
   const { isHipaaProjectDisallowed } = useOrgAiOptInLevel()
   const showPrettyExplain = useFlag('ShowPrettyExplain')
+
+  // Register SQL Editor keyboard shortcuts
+  useKeyboardShortcuts({
+    shortcuts: [
+      {
+        key: 'k',
+        metaKey: os === 'macos',
+        ctrlKey: os !== 'macos',
+        action: () => openSidebar(SIDEBAR_KEYS.SEARCH),
+        description: 'Open search',
+      },
+    ],
+    enabled: true,
+  })
 
   const {
     sourceSqlDiff,
