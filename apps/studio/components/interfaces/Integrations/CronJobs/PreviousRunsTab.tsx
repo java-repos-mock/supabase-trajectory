@@ -7,12 +7,13 @@ import { useParams } from 'common'
 import {
   CronJobRun,
   useCronJobRunsInfiniteQuery,
+  formatJobRunDuration,
 } from 'data/database-cron-jobs/database-cron-jobs-runs-infinite-query'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import { cn, CodeBlock, LoadingLine, Tooltip, TooltipContent, TooltipTrigger } from 'ui'
 import { TimestampInfo } from 'ui-patterns'
 import { GenericSkeletonLoader } from 'ui-patterns/ShimmeringLoader'
-import { calculateDuration, formatDate } from './CronJobs.utils'
+import { formatDate } from './CronJobs.utils'
 import CronJobsEmptyState from './CronJobsEmptyState'
 
 const cronJobColumns = [
@@ -94,9 +95,7 @@ const cronJobColumns = [
     minWidth: 100,
     value: (row: CronJobRun) => (
       <div className="flex items-center">
-        <span className="text-xs">
-          {row.start_time && row.end_time ? calculateDuration(row.start_time, row.end_time) : ''}
-        </span>
+        <span className="text-xs">{formatJobRunDuration(row)}</span>
       </div>
     ),
   },
