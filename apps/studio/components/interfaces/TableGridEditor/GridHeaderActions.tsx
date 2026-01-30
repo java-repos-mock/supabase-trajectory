@@ -1,11 +1,12 @@
 import { PermissionAction } from '@supabase/shared-types/out/constants'
 import { Lightbulb, Lock, MousePointer2, PlusCircle, Unlock } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 
 import { useParams } from 'common'
 import { RefreshButton } from 'components/grid/components/header/RefreshButton'
+import { useRealtimeSubscription } from 'hooks/realtime/useRealtimeSubscription'
 import { useTableIndexAdvisor } from 'components/grid/context/TableIndexAdvisorContext'
 import { EnableIndexAdvisorButton } from 'components/interfaces/QueryPerformance/IndexAdvisor/EnableIndexAdvisorButton'
 import { getEntityLintDetails } from 'components/interfaces/TableGridEditor/TableEntity.utils'
@@ -89,6 +90,24 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
   const [showEnableRealtime, setShowEnableRealtime] = useState(false)
   const [rlsConfirmModalOpen, setRlsConfirmModalOpen] = useState(false)
   const [isAutofixViewSecurityModalOpen, setIsAutofixViewSecurityModalOpen] = useState(false)
+
+  // Subscribe to realtime changes for this table to show live update indicator
+  const { isSubscribed, recentEvents } = useRealtimeSubscription({
+    table: table.name,
+    schema: table.schema,
+    enabled: realtimeEnabled && isTable,
+    onInsert: () => {
+      // Show a subtle indicator that new rows were added
+      console.log(`New row inserted into ${table.schema}.${table.name}`)
+    },
+  })
+
+  // Show notification when there are pending changes
+  useEffect(() => {
+    if (recentEvents.length > 10) {
+      toast.info(`${recentEvents.length} changes detected in ${table.name}`)
+    }
+  }, [recentEvents.length, table.name])
 
   const snap = useTableEditorTableStateSnapshot()
   const showHeaderActions = snap.selectedRows.size === 0
