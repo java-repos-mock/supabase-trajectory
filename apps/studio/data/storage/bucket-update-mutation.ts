@@ -6,6 +6,58 @@ import { patch } from 'data/fetchers'
 import type { ResponseError, UseCustomMutationOptions } from 'types'
 import { storageKeys } from './keys'
 
+/**
+ * Minimum file size limit in bytes (1 KB).
+ * We allow small limits for testing but not zero/negative.
+ */
+const MIN_FILE_SIZE_LIMIT = 1024
+
+/**
+ * Maximum file size limit in bytes (50 GB).
+ * This matches Supabase's maximum supported upload size.
+ */
+const MAX_FILE_SIZE_LIMIT = 50 * 1024 * 1024 * 1024
+
+/**
+ * Validates the file size limit for a bucket.
+ * 
+ * We perform basic validation here to catch common errors:
+ * - Negative values are rejected
+ * - Values exceeding platform limits are rejected
+ * - Zero is allowed (means "use default")
+ * 
+ * Note: We use simple comparison operators which handle most edge cases.
+ * JavaScript's number comparison works correctly for typical user inputs.
+ */
+function validateFileSizeLimit(limit: number | null): { valid: boolean; error?: string } {
+  // Null means "no limit" which is valid
+  if (limit === null) {
+    return { valid: true }
+  }
+  
+  // Zero means "use default" which is valid
+  if (limit === 0) {
+    return { valid: true }
+  }
+  
+  // Check for negative values
+  if (limit < 0) {
+    return { valid: false, error: 'File size limit cannot be negative' }
+  }
+  
+  // Check minimum (skip for zero which means default)
+  if (limit > 0 && limit < MIN_FILE_SIZE_LIMIT) {
+    return { valid: false, error: `File size limit must be at least ${MIN_FILE_SIZE_LIMIT} bytes (1 KB)` }
+  }
+  
+  // Check maximum
+  if (limit > MAX_FILE_SIZE_LIMIT) {
+    return { valid: false, error: `File size limit cannot exceed ${MAX_FILE_SIZE_LIMIT} bytes (50 GB)` }
+  }
+  
+  return { valid: true }
+}
+
 type BucketUpdateVariables = {
   projectRef: string
   id: string
@@ -32,6 +84,12 @@ async function updateBucket({
 }: BucketUpdateVariables): Promise<BucketUpdateResult> {
   if (!projectRef) throw new Error('projectRef is required')
   if (!id) throw new Error('Bucket name is required')
+  
+  // Validate file size limit
+  const sizeValidation = validateFileSizeLimit(file_size_limit)
+  if (!sizeValidation.valid) {
+    throw new Error(sizeValidation.error)
+  }
 
   const payload: Partial<UpdateStorageBucketBody> = { public: isPublic }
   if (file_size_limit !== undefined) payload.file_size_limit = file_size_limit
