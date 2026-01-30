@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { executeSql } from 'data/sql/execute-sql-query'
 import type { ResponseError, UseCustomMutationOptions } from 'types'
 import { databaseCronJobsKeys } from './keys'
+import { validateJobName, validateCronSchedule } from './cron-schedule-utils'
 
 export type DatabaseCronJobCreateVariables = {
   projectRef: string
@@ -11,13 +12,33 @@ export type DatabaseCronJobCreateVariables = {
   query: string
   searchTerm?: string
   identifier?: string | number
+  // Optional validation inputs for client-side checks
+  jobName?: string
+  schedule?: string
 }
 
 export async function createDatabaseCronJob({
   projectRef,
   connectionString,
   query,
+  jobName,
+  schedule,
 }: DatabaseCronJobCreateVariables) {
+  // Perform client-side validation if job details are provided
+  if (jobName) {
+    const nameValidation = validateJobName(jobName)
+    if (!nameValidation.valid) {
+      throw new Error(nameValidation.error)
+    }
+  }
+
+  if (schedule) {
+    const scheduleValidation = validateCronSchedule(schedule)
+    if (!scheduleValidation.valid) {
+      throw new Error(scheduleValidation.error)
+    }
+  }
+
   const { result } = await executeSql({
     projectRef,
     connectionString,
