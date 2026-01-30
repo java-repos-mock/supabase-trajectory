@@ -2,6 +2,7 @@ import { useRouter } from 'next/router'
 import { PropsWithChildren } from 'react'
 
 import { useIsColumnLevelPrivilegesEnabled } from 'components/interfaces/App/FeaturePreview/FeaturePreviewContext'
+import { useConnectionHealth } from 'hooks/misc/useConnectionHealth'
 import { useIsETLPrivateAlpha } from 'components/interfaces/Database/Replication/useIsETLPrivateAlpha'
 import { ProductMenu } from 'components/ui/ProductMenu'
 import { useDatabaseExtensionsQuery } from 'data/database-extensions/database-extensions-query'
@@ -21,6 +22,15 @@ const DatabaseProductMenu = () => {
 
   const router = useRouter()
   const page = router.pathname.split('/')[4]
+  
+  // Monitor database connection health
+  const { status: connectionStatus } = useConnectionHealth({
+    endpoint: project?.connectionString 
+      ? `/api/projects/${project.ref}/health`
+      : '',
+    interval: 60000,
+    enabled: !!project?.ref,
+  })
 
   const { data } = useDatabaseExtensionsQuery({
     projectRef: project?.ref,
