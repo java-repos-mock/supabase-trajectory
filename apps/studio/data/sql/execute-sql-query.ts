@@ -4,6 +4,7 @@ import { DEFAULT_PLATFORM_APPLICATION_NAME } from '@supabase/pg-meta/src/constan
 import { handleError as handleErrorFetchers, post } from 'data/fetchers'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import { MB, PROJECT_STATUS } from 'lib/constants'
+import { validateConnectionString } from 'lib/database/connection-string-utils'
 import {
   ROLE_IMPERSONATION_NO_RESULTS,
   ROLE_IMPERSONATION_SQL_LINE_COUNT,
@@ -55,6 +56,15 @@ export async function executeSql<T = any>(
   }) => Promise<{ data: T } | { error: ResponseError }>
 ): Promise<{ result: T }> {
   if (!projectRef) throw new Error('projectRef is required')
+
+  // Validate connection string format if provided
+  if (connectionString) {
+    const validation = validateConnectionString(connectionString)
+    if (!validation.valid) {
+      console.warn('Connection string validation warning:', validation.error)
+      // Continue anyway - the server will validate the actual connection
+    }
+  }
 
   const sqlSize = new Blob([sql]).size
   // [Joshen] I think the limit is around 1MB from testing, but its not exactly 1MB it seems
