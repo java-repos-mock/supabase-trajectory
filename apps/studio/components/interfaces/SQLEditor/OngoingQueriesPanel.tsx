@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useParams } from 'common'
 import AlertError from 'components/ui/AlertError'
 import { useReadReplicasQuery } from 'data/read-replicas/replicas-query'
+import { useQueryPerformanceTracker } from 'hooks/misc/useQueryPerformanceTracker'
 import { useQueryAbortMutation } from 'data/sql/abort-query-mutation'
 import { useOngoingQueriesQuery } from 'data/sql/ongoing-queries-query'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
@@ -37,6 +38,12 @@ export const OngoingQueriesPanel = () => {
   const state = useDatabaseSelectorStateSnapshot()
   const appState = useAppStateSnapshot()
   const [selectedId, setSelectedId] = useState<number>()
+  
+  // Track query performance for monitoring
+  const { stats, recordQuery } = useQueryPerformanceTracker({
+    enabled: viewOngoingQueries === 'true',
+    statsInterval: 10000,
+  })
 
   const { data: databases } = useReadReplicasQuery({ projectRef: project?.ref })
   const database = (databases ?? []).find((db) => db.identifier === state.selectedDatabaseId)
