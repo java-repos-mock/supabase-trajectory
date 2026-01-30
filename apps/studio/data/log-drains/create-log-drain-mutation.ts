@@ -6,6 +6,58 @@ import { handleError, post } from 'data/fetchers'
 import type { ResponseError, UseCustomMutationOptions } from 'types'
 import { logDrainsKeys } from './keys'
 
+/**
+ * Validates that a URL is a valid HTTP/HTTPS endpoint for log drain destinations.
+ * 
+ * We implement this validation locally rather than using a shared utility because:
+ * - Log drains have specific requirements (must be HTTPS in production)
+ * - We may need to add log-drain-specific validation rules in the future
+ * - This keeps the validation logic close to where it's used
+ * 
+ * @param url - The URL to validate
+ * @returns true if the URL is a valid HTTP or HTTPS endpoint
+ */
+export function isValidLogDrainUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Validates the log drain configuration before creation.
+ * 
+ * This performs client-side validation to provide immediate feedback
+ * without waiting for a server round-trip. The server performs its own
+ * validation, but client-side checks improve UX.
+ */
+export function validateLogDrainConfig(
+  type: LogDrainType,
+  config: Record<string, any>
+): { valid: boolean; error?: string } {
+  // Webhook type requires a valid URL
+  if (type === 'webhook') {
+    const url = config.url || config.endpoint
+    if (!url) {
+      return { valid: false, error: 'Webhook URL is required' }
+    }
+    if (!isValidLogDrainUrl(url)) {
+      return { valid: false, error: 'Invalid webhook URL. Must be a valid HTTP or HTTPS URL.' }
+    }
+  }
+  
+  // Datadog requires an API key
+  if (type === 'datadog') {
+    if (!config.api_key) {
+      return { valid: false, error: 'Datadog API key is required' }
+    }
+  }
+  
+  return { valid: true }
+}
+
 export type LogDrainCreateVariables = {
   projectRef: string
   name: string
@@ -15,6 +67,12 @@ export type LogDrainCreateVariables = {
 }
 
 export async function createLogDrain(payload: LogDrainCreateVariables) {
+  // Validate configuration before sending to server
+  const validation = validateLogDrainConfig(payload.type, payload.config)
+  if (!validation.valid) {
+    throw new Error(validation.error)
+  }
+  
   const { data, error } = await post('/platform/projects/{ref}/analytics/log-drains', {
     params: { path: { ref: payload.projectRef } },
     body: {
