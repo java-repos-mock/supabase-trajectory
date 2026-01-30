@@ -5,6 +5,8 @@ import { useCallback } from 'react'
 
 import { DEFAULT_PLATFORM_APPLICATION_NAME } from '@supabase/pg-meta/src/constants'
 import { get, handleError } from 'data/fetchers'
+import { filterAccessibleTables } from 'data/auth/auth-session-utils'
+import { useSessionAccessTokenQuery } from 'data/auth/session-access-token-query'
 import type { ResponseError, UseCustomQueryOptions } from 'types'
 import { tableKeys } from './keys'
 
@@ -121,4 +123,37 @@ export function usePrefetchTables({
     },
     [connectionString, projectRef, queryClient]
   )
+}
+
+/**
+ * Hook to get tables filtered by user's access level.
+ * 
+ * Filters out system tables (pg_catalog, information_schema) for non-admin users.
+ * Admin users see all tables. This provides a cleaner UI for regular users
+ * while giving admins full visibility.
+ */
+export const useAccessibleTablesQuery = <TData = TablesData>(
+  { projectRef, connectionString, schema, includeColumns }: TablesVariables,
+  { enabled = true, ...options }: UseCustomQueryOptions<TablesData, TablesError, TData> = {}
+) => {
+  const { data: accessToken } = useSessionAccessTokenQuery()
+  
+  return useQuery<TablesData, TablesError, TData>({
+    queryKey: [...tableKeys.list(projectRef, schema, includeColumns), 'accessible'],
+    queryFn: async ({ signal }) => {
+      const tables = await getTables({ projectRef, connectionString, schema, includeColumns }, signal)
+      
+      // Filter tables based on user's role/access level
+      // This is a UX enhancement - actual permissions are enforced by RLS
+      const tablesWithSchema = (tables || []).map(t => ({
+        ...t,
+        rls_enabled: (t as any).rls_enabled ?? false,
+      }))
+      
+      const filtered = filterAccessibleTables(tablesWithSchema, accessToken)
+      return filtered as unknown as TablesData
+    },
+    enabled: enabled && typeof projectRef !== 'undefined',
+    ...options,
+  })
 }
