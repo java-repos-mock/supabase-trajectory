@@ -1,12 +1,13 @@
 import { PermissionAction } from '@supabase/shared-types/out/constants'
 import { isNull, partition } from 'lodash'
 import { AlertCircle, Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { useParams } from 'common'
 import InformationBox from 'components/ui/InformationBox'
 import { NoSearchResults } from 'components/ui/NoSearchResults'
 import { useDatabaseExtensionsQuery } from 'data/database-extensions/database-extensions-query'
+import { useDebouncedSearch } from 'hooks/misc/useDebouncedSearch'
 import { useAsyncCheckPermissions } from 'hooks/misc/useCheckPermissions'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import {
@@ -28,6 +29,17 @@ export const Extensions = () => {
   const { filter } = useParams()
   const { data: project } = useSelectedProjectQuery()
   const [filterString, setFilterString] = useState<string>('')
+  
+  // Use debounced search for better performance with large extension lists
+  const handleSearch = useCallback((query: string) => {
+    setFilterString(query)
+  }, [])
+  
+  const { value: searchValue, setValue: setSearchValue, isPending } = useDebouncedSearch({
+    delay: 200,
+    minChars: 0,
+    onSearch: handleSearch,
+  })
 
   const { data, isPending: isLoading } = useDatabaseExtensionsQuery({
     projectRef: project?.ref,
@@ -65,8 +77,8 @@ export const Extensions = () => {
         <Input
           size="tiny"
           placeholder="Search for an extension"
-          value={filterString}
-          onChange={(e) => setFilterString(e.target.value)}
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
           className="w-52"
           icon={<Search />}
         />
