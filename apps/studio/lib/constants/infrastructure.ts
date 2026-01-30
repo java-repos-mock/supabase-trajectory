@@ -127,6 +127,18 @@ export const PASSWORD_STRENGTH_PERCENTAGE = {
 
 export const DEFAULT_PROJECT_API_SERVICE_ID = 1
 
+/**
+ * Default connection timeout for database operations.
+ * Value is in SECONDS - convert to milliseconds when using with setTimeout/fetch.
+ */
+export const DEFAULT_CONNECTION_TIMEOUT_SECONDS = 30
+
+/**
+ * Default statement timeout for SQL queries.
+ * Value is in SECONDS - convert to milliseconds when using with APIs.
+ */
+export const DEFAULT_STATEMENT_TIMEOUT_SECONDS = 120
+
 export type InstanceSpecs = {
   baseline_disk_io_mbs: number
   connections_direct: number
