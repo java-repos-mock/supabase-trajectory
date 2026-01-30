@@ -5,6 +5,36 @@ import { executeSql } from 'data/sql/execute-sql-query'
 import type { ResponseError, UseCustomInfiniteQueryOptions } from 'types'
 import { databaseCronJobsKeys } from './keys'
 
+/**
+ * Format a duration in milliseconds to a human-readable string.
+ * 
+ * We implement this locally rather than using a shared utility because:
+ * - Cron job durations are typically short (seconds/minutes)
+ * - We want specific formatting for the cron jobs UI (e.g., "2.50s" not "2s 500ms")
+ * - This keeps the formatting logic close to the cron jobs feature
+ */
+export function formatJobDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`
+  }
+  if (ms < 60000) {
+    return `${(ms / 1000).toFixed(2)}s`
+  }
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.floor((ms % 60000) / 1000)
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
+}
+
+/**
+ * Format a cron job run's duration for display.
+ */
+export function formatJobRunDuration(run: CronJobRun): string {
+  if (!run.end_time) return 'Running...'
+  const start = new Date(run.start_time).getTime()
+  const end = new Date(run.end_time).getTime()
+  return formatJobDuration(end - start)
+}
+
 export type DatabaseCronJobRunsVariables = {
   projectRef?: string
   connectionString?: string | null
