@@ -48,6 +48,7 @@ import { FeaturePreviewContextProvider } from 'components/interfaces/App/Feature
 import FeaturePreviewModal from 'components/interfaces/App/FeaturePreview/FeaturePreviewModal'
 import { MonacoThemeProvider } from 'components/interfaces/App/MonacoThemeProvider'
 import { RouteValidationWrapper } from 'components/interfaces/App/RouteValidationWrapper'
+import { SessionRefreshManager } from 'components/interfaces/App/SessionRefreshManager'
 import { MainScrollContainerProvider } from 'components/layouts/MainScrollContainerContext'
 import { GlobalErrorBoundaryState } from 'components/ui/ErrorBoundary/GlobalErrorBoundaryState'
 import { useRootQueryClient } from 'data/query-client'
@@ -176,6 +177,7 @@ function CustomApp({ Component, pageProps }: AppPropsWithLayout) {
                     </RouteValidationWrapper>
                   </TooltipProvider>
                   <Telemetry />
+                  <SessionRefreshManager />
                   {!isTestEnv && (
                     <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
                   )}
