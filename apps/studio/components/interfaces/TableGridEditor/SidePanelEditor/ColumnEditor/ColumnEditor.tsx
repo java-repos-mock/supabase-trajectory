@@ -16,6 +16,7 @@ import {
   useForeignKeyConstraintsQuery,
 } from 'data/database/foreign-key-constraints-query'
 import { useEnumeratedTypesQuery } from 'data/enumerated-types/enumerated-types-query'
+import { useOptimisticColumnUpdate } from 'hooks/misc/useOptimisticColumnUpdate'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import { useProtectedSchemas } from 'hooks/useProtectedSchemas'
 import { DOCS_URL } from 'lib/constants'
@@ -72,6 +73,7 @@ export const ColumnEditor = ({
 }: ColumnEditorProps) => {
   const { ref } = useParams()
   const { data: project } = useSelectedProjectQuery()
+  const { updateColumnComment } = useOptimisticColumnUpdate()
 
   const [errors, setErrors] = useState<Dictionary<any>>({})
   const [columnFields, setColumnFields] = useState<ColumnField>()
