@@ -1,7 +1,7 @@
 import { PermissionAction } from '@supabase/shared-types/out/constants'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useCallback } from 'react'
+import React, { useCallback } from 'react'
 
 import { useParams } from 'common'
 import { SupabaseGrid } from 'components/grid/SupabaseGrid'
@@ -17,6 +17,7 @@ import {
 import { useAsyncCheckPermissions } from 'hooks/misc/useCheckPermissions'
 import { useDashboardHistory } from 'hooks/misc/useDashboardHistory'
 import { useQuerySchemaState } from 'hooks/misc/useSchemaQueryState'
+import { useSchemaCache } from 'hooks/misc/useSchemaCache'
 import { useUrlState } from 'hooks/ui/useUrlState'
 import { useIsProtectedSchema } from 'hooks/useProtectedSchemas'
 import { TableEditorTableStateContextProvider } from 'state/table-editor-table'
@@ -40,6 +41,14 @@ export const TableGridEditor = ({
   const { ref: projectRef, id } = useParams()
   const { setLastVisitedTable } = useDashboardHistory()
   const { selectedSchema } = useQuerySchemaState()
+  const { prefetchSchema } = useSchemaCache()
+
+  // Prefetch schema data for faster navigation
+  React.useEffect(() => {
+    if (selectedSchema) {
+      prefetchSchema(selectedSchema)
+    }
+  }, [selectedSchema, prefetchSchema])
 
   const tabs = useTabsStateSnapshot()
 
