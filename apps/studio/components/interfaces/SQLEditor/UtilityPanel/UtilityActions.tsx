@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { LOCAL_STORAGE_KEYS, useParams } from 'common'
 import { RoleImpersonationPopover } from 'components/interfaces/RoleImpersonationSelector/RoleImpersonationPopover'
+import { QueryFavoritesDropdown } from 'components/interfaces/SQLEditor/QueryFavoritesDropdown'
 import { DatabaseSelector } from 'components/ui/DatabaseSelector'
 import { useLocalStorageQuery } from 'hooks/misc/useLocalStorage'
 import { IS_PLATFORM } from 'lib/constants'
@@ -71,9 +72,24 @@ const UtilityActions = ({
     setLastSelectedDb(databaseId)
   }
 
+  const currentSql = snippet?.snippet?.content?.sql || ''
+
+  const handleSelectFavorite = (sql: string) => {
+    // Load the favorite SQL into the editor
+    if (id && sql) {
+      snapV2.setSql(id, sql)
+    }
+  }
+
   return (
     <div className="inline-flex items-center justify-end gap-x-2">
       {IS_PLATFORM && <SavingIndicator id={id} />}
+
+      {/* Quick access to query favorites */}
+      <QueryFavoritesDropdown
+        currentSql={currentSql}
+        onSelectFavorite={handleSelectFavorite}
+      />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
