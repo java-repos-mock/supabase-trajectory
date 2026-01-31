@@ -46,6 +46,7 @@ import {
 import ConfirmationModal from 'ui-patterns/Dialogs/ConfirmationModal'
 import { RoleImpersonationPopover } from '../RoleImpersonationSelector/RoleImpersonationPopover'
 import ViewEntityAutofixSecurityModal from './ViewEntityAutofixSecurityModal'
+import { QuickCreateColumnModal } from './QuickCreateColumnModal'
 
 export interface GridHeaderActionsProps {
   table: Entity
@@ -89,6 +90,7 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
   const [showEnableRealtime, setShowEnableRealtime] = useState(false)
   const [rlsConfirmModalOpen, setRlsConfirmModalOpen] = useState(false)
   const [isAutofixViewSecurityModalOpen, setIsAutofixViewSecurityModalOpen] = useState(false)
+  const [showQuickCreateColumn, setShowQuickCreateColumn] = useState(false)
 
   const snap = useTableEditorTableStateSnapshot()
   const showHeaderActions = snap.selectedRows.size === 0
@@ -542,6 +544,17 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
             <APIDocsButton section={['entities', table.name]} source="table_editor" />
           )}
 
+          {isTable && !isSchemaLocked && (
+            <Button
+              type="default"
+              size="tiny"
+              icon={<PlusCircle size={14} />}
+              onClick={() => setShowQuickCreateColumn(true)}
+            >
+              Quick Add Column
+            </Button>
+          )}
+
           <RefreshButton tableId={table.id} isRefetching={isRefetching} />
         </div>
       )}
@@ -590,6 +603,16 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
           loading={isUpdatingTable}
           onCancel={closeConfirmModal}
           onConfirm={onToggleRLS}
+        />
+      )}
+
+      {isTable && (
+        <QuickCreateColumnModal
+          visible={showQuickCreateColumn}
+          tableId={table.id}
+          tableName={table.name}
+          schema={table.schema}
+          onClose={() => setShowQuickCreateColumn(false)}
         />
       )}
     </div>
