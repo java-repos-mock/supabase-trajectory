@@ -9,6 +9,7 @@ import {
   posthogClient,
   useAuthError,
 } from 'common'
+import { listenForAuthEvents, broadcastAuthEvent } from './auth-lock-handler'
 import { useAiAssistantStateSnapshot } from 'state/ai-assistant-state'
 import { GOTRUE_ERRORS, IS_PLATFORM } from './constants'
 
@@ -46,6 +47,10 @@ export function useSignOut() {
 
   return useCallback(async () => {
     const result = await gotrueClient.signOut()
+    
+    // Notify other tabs about sign out
+    broadcastAuthEvent('signed_out')
+    
     posthogClient.reset()
     clearLocalStorage()
     // Clear Assistant IndexedDB
