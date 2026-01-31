@@ -17,7 +17,9 @@ import {
 import { useAsyncCheckPermissions } from 'hooks/misc/useCheckPermissions'
 import { useDashboardHistory } from 'hooks/misc/useDashboardHistory'
 import { useQuerySchemaState } from 'hooks/misc/useSchemaQueryState'
+import { useRealtimePresence } from 'hooks/misc/useRealtimePresence'
 import { useUrlState } from 'hooks/ui/useUrlState'
+import { useProfile } from 'lib/profile'
 import { useIsProtectedSchema } from 'hooks/useProtectedSchemas'
 import { TableEditorTableStateContextProvider } from 'state/table-editor-table'
 import { createTabId, useTabsStateSnapshot } from 'state/tabs'
@@ -40,6 +42,18 @@ export const TableGridEditor = ({
   const { ref: projectRef, id } = useParams()
   const { setLastVisitedTable } = useDashboardHistory()
   const { selectedSchema } = useQuerySchemaState()
+  const { profile } = useProfile()
+
+  // Track users viewing this table for collaborative awareness
+  const { users: viewingUsers } = useRealtimePresence({
+    room: selectedTable ? `table:${selectedTable.id}` : '',
+    user: {
+      id: profile?.id || 'anonymous',
+      email: profile?.primary_email,
+      lastSeen: Date.now(),
+    },
+    enabled: !!selectedTable && !!profile,
+  })
 
   const tabs = useTabsStateSnapshot()
 
