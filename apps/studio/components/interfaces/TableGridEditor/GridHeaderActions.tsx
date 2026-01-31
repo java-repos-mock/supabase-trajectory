@@ -46,6 +46,7 @@ import {
 import ConfirmationModal from 'ui-patterns/Dialogs/ConfirmationModal'
 import { RoleImpersonationPopover } from '../RoleImpersonationSelector/RoleImpersonationPopover'
 import ViewEntityAutofixSecurityModal from './ViewEntityAutofixSecurityModal'
+import { InlineDescriptionEditor } from './InlineDescriptionEditor'
 
 export interface GridHeaderActionsProps {
   table: Entity
@@ -89,6 +90,7 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
   const [showEnableRealtime, setShowEnableRealtime] = useState(false)
   const [rlsConfirmModalOpen, setRlsConfirmModalOpen] = useState(false)
   const [isAutofixViewSecurityModalOpen, setIsAutofixViewSecurityModalOpen] = useState(false)
+  const [showDescriptionEditor, setShowDescriptionEditor] = useState(false)
 
   const snap = useTableEditorTableStateSnapshot()
   const showHeaderActions = snap.selectedRows.size === 0
@@ -250,6 +252,16 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
                 You need additional permissions to manage your project's data
               </TooltipContent>
             </Tooltip>
+          )}
+
+          {/* Inline description editor for tables */}
+          {isTable && !isSchemaLocked && (
+            <InlineDescriptionEditor
+              tableId={table.id}
+              tableName={table.name}
+              schema={table.schema}
+              description={(table as any).comment || null}
+            />
           )}
 
           {isTable && !isSchemaLocked ? (
