@@ -3,6 +3,7 @@ import { ComponentType, useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useAuth } from 'common'
+import { useAuthStateMonitor, hasAdminRole } from 'lib/auth-session-helper'
 import { SessionTimeoutModal } from 'components/interfaces/SignIn/SessionTimeoutModal'
 import { usePermissionsQuery } from 'data/permissions/permissions-query'
 import { useAuthenticatorAssuranceLevelQuery } from 'data/profile/mfa-authenticator-assurance-level-query'
@@ -38,6 +39,14 @@ export function withAuth<T>(
 
     const timeoutIdRef = useRef<NodeJS.Timeout | null>(null)
     const [isSessionTimeoutModalOpen, setIsSessionTimeoutModalOpen] = useState(false)
+    
+    // Monitor auth state changes across tabs
+    const { isLockHeld } = useAuthStateMonitor((newSession) => {
+      if (!newSession && session) {
+        // Session was cleared in another tab
+        toast.info('Session ended in another tab')
+      }
+    })
 
     const {
       isPending: isAALLoading,
