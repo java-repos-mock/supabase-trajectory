@@ -1,5 +1,5 @@
 import { PermissionAction } from '@supabase/shared-types/out/constants'
-import { Lightbulb, Lock, MousePointer2, PlusCircle, Unlock } from 'lucide-react'
+import { Lightbulb, Lock, MousePointer2, PlusCircle, Unlock, Upload } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -46,6 +46,7 @@ import {
 import ConfirmationModal from 'ui-patterns/Dialogs/ConfirmationModal'
 import { RoleImpersonationPopover } from '../RoleImpersonationSelector/RoleImpersonationPopover'
 import ViewEntityAutofixSecurityModal from './ViewEntityAutofixSecurityModal'
+import { CSVImportModal } from './CSVImportModal'
 
 export interface GridHeaderActionsProps {
   table: Entity
@@ -89,6 +90,7 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
   const [showEnableRealtime, setShowEnableRealtime] = useState(false)
   const [rlsConfirmModalOpen, setRlsConfirmModalOpen] = useState(false)
   const [isAutofixViewSecurityModalOpen, setIsAutofixViewSecurityModalOpen] = useState(false)
+  const [showCSVImportModal, setShowCSVImportModal] = useState(false)
 
   const snap = useTableEditorTableStateSnapshot()
   const showHeaderActions = snap.selectedRows.size === 0
@@ -542,6 +544,17 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
             <APIDocsButton section={['entities', table.name]} source="table_editor" />
           )}
 
+          {isTable && !isSchemaLocked && (
+            <Button
+              type="default"
+              size="tiny"
+              icon={<Upload size={14} />}
+              onClick={() => setShowCSVImportModal(true)}
+            >
+              Import CSV
+            </Button>
+          )}
+
           <RefreshButton tableId={table.id} isRefetching={isRefetching} />
         </div>
       )}
@@ -590,6 +603,17 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
           loading={isUpdatingTable}
           onCancel={closeConfirmModal}
           onConfirm={onToggleRLS}
+        />
+      )}
+
+      {/* CSV Import Modal */}
+      {isTable && (
+        <CSVImportModal
+          visible={showCSVImportModal}
+          tableId={table.id}
+          tableName={table.name}
+          schema={table.schema}
+          onClose={() => setShowCSVImportModal(false)}
         />
       )}
     </div>
