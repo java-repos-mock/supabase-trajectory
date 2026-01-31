@@ -5,6 +5,7 @@ import { useDebounce } from 'use-debounce'
 
 import { useSqlCronGenerateMutation } from 'data/ai/sql-cron-mutation'
 import { useCronTimezoneQuery } from 'data/database-cron-jobs/database-cron-timezone-query'
+import { useCronScheduleBuilder, SCHEDULE_PRESETS } from 'hooks/misc/useCronScheduleBuilder'
 import { useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import {
   Accordion_Shadcn_,
@@ -38,6 +39,16 @@ export const CronJobScheduleSection = ({ form, supportsSeconds }: CronJobSchedul
   const [inputValue, setInputValue] = useState('')
   const [debouncedValue] = useDebounce(inputValue, 750)
   const [useNaturalLanguage, setUseNaturalLanguage] = useState(false)
+  
+  // Schedule builder for advanced editing
+  const { parseExpression, description: scheduleDescription } = useCronScheduleBuilder({
+    onChange: (expr) => {
+      // Apply new expression when builder changes
+      if (expr) {
+        form.setValue('schedule', expr, { shouldValidate: true })
+      }
+    },
+  })
 
   const PRESETS = [
     ...(supportsSeconds ? [{ name: 'Every 30 seconds', expression: '30 seconds' }] : []),
