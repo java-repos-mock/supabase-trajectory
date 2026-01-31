@@ -17,6 +17,7 @@ import {
 import { useAsyncCheckPermissions } from 'hooks/misc/useCheckPermissions'
 import { useDashboardHistory } from 'hooks/misc/useDashboardHistory'
 import { useQuerySchemaState } from 'hooks/misc/useSchemaQueryState'
+import { useTableFilterPersistence } from 'hooks/misc/useTableFilterPersistence'
 import { useUrlState } from 'hooks/ui/useUrlState'
 import { useIsProtectedSchema } from 'hooks/useProtectedSchemas'
 import { TableEditorTableStateContextProvider } from 'state/table-editor-table'
@@ -40,6 +41,12 @@ export const TableGridEditor = ({
   const { ref: projectRef, id } = useParams()
   const { setLastVisitedTable } = useDashboardHistory()
   const { selectedSchema } = useQuerySchemaState()
+
+  // Persist filters for the current table
+  const { filters, isLoaded: filtersLoaded } = useTableFilterPersistence(
+    selectedTable?.name || '',
+    selectedTable?.schema || ''
+  )
 
   const tabs = useTabsStateSnapshot()
 
