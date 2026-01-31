@@ -1,5 +1,5 @@
 import { PermissionAction } from '@supabase/shared-types/out/constants'
-import { Lightbulb, Lock, MousePointer2, PlusCircle, Unlock } from 'lucide-react'
+import { Lightbulb, Lock, MousePointer2, PlusCircle, Trash2, Unlock } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -46,6 +46,7 @@ import {
 import ConfirmationModal from 'ui-patterns/Dialogs/ConfirmationModal'
 import { RoleImpersonationPopover } from '../RoleImpersonationSelector/RoleImpersonationPopover'
 import ViewEntityAutofixSecurityModal from './ViewEntityAutofixSecurityModal'
+import { BulkDeleteConfirmModal } from './BulkDeleteConfirmModal'
 
 export interface GridHeaderActionsProps {
   table: Entity
@@ -89,6 +90,7 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
   const [showEnableRealtime, setShowEnableRealtime] = useState(false)
   const [rlsConfirmModalOpen, setRlsConfirmModalOpen] = useState(false)
   const [isAutofixViewSecurityModalOpen, setIsAutofixViewSecurityModalOpen] = useState(false)
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
 
   const snap = useTableEditorTableStateSnapshot()
   const showHeaderActions = snap.selectedRows.size === 0
@@ -237,6 +239,23 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
 
   return (
     <div className="sb-grid-header__inner">
+      {/* Show bulk actions when rows are selected */}
+      {!showHeaderActions && snap.selectedRows.size > 0 && (
+        <div className="flex items-center gap-x-2">
+          <span className="text-sm text-foreground-light">
+            {snap.selectedRows.size} row{snap.selectedRows.size > 1 ? 's' : ''} selected
+          </span>
+          <Button
+            type="danger"
+            size="tiny"
+            icon={<Trash2 size={14} />}
+            onClick={() => setShowBulkDeleteModal(true)}
+          >
+            Delete Selected
+          </Button>
+        </div>
+      )}
+
       {showHeaderActions && (
         <div className="flex items-center gap-x-2">
           {isReadOnly && (
@@ -590,6 +609,20 @@ export const GridHeaderActions = ({ table, isRefetching }: GridHeaderActionsProp
           loading={isUpdatingTable}
           onCancel={closeConfirmModal}
           onConfirm={onToggleRLS}
+        />
+      )}
+
+      {/* Bulk Delete Modal */}
+      {isTable && (
+        <BulkDeleteConfirmModal
+          visible={showBulkDeleteModal}
+          tableId={table.id}
+          tableName={table.name}
+          schema={table.schema}
+          primaryKeyColumn="id"
+          selectedRows={Array.from(snap.selectedRows).map(id => ({ id }))}
+          onClose={() => setShowBulkDeleteModal(false)}
+          onDeleted={() => snap.clearSelectedRows()}
         />
       )}
     </div>
