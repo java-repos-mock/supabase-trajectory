@@ -1,6 +1,7 @@
 import type { User } from 'data/auth/users-infinite-query'
 import { RoleImpersonationState as ValtioRoleImpersonationState } from 'state/role-impersonation-state'
 import { uuidv4 } from './helpers'
+import { createSetRoleSql, escapeSqlLiteral, validateRoleName } from './sql-sanitize'
 
 type PostgrestImpersonationRole =
   | {
@@ -92,15 +93,27 @@ export function getPostgrestClaims(projectRef: string, role: PostgrestImpersonat
   }
 }
 
+/**
+ * Generates SQL to configure PostgREST role impersonation.
+ * Sets up the role and JWT claims for the impersonated session.
+ *
+ * @param role - The PostgREST role configuration
+ * @param claims - The JWT claims for the impersonated user
+ * @returns SQL statement to configure the session
+ */
 function getPostgrestRoleImpersonationSql(
   role: PostgrestImpersonationRole,
   claims: ReturnType<typeof getPostgrestClaims>
 ) {
   const unexpiredClaims = { ...claims, exp: getExp1HourFromNow() }
 
+  // Escape the role name and claims for safe SQL insertion
+  const escapedRole = role.role.replace(/'/g, "''")
+  const escapedClaims = JSON.stringify(unexpiredClaims).replace(/'/g, "''")
+
   return `
-select set_config('role', '${role.role}', true),
-set_config('request.jwt.claims', '${JSON.stringify(unexpiredClaims).replaceAll("'", "''")}', true),
+select set_config('role', '${escapedRole}', true),
+set_config('request.jwt.claims', '${escapedClaims}', true),
 set_config('request.method', 'POST', true),
 set_config('request.path', '/impersonation-example-request-path', true),
 set_config('request.headers', '{"accept": "*/*"}', true);
@@ -111,10 +124,23 @@ set_config('request.headers', '{"accept": "*/*"}', true);
 export const ROLE_IMPERSONATION_SQL_LINE_COUNT = 11
 export const ROLE_IMPERSONATION_NO_RESULTS = 'ROLE_IMPERSONATION_NO_RESULTS'
 
+/**
+ * Generates SQL to set a custom role for impersonation.
+ * Uses proper SQL sanitization to prevent SQL injection attacks.
+ *
+ * @param roleName - The name of the role to impersonate
+ * @returns SQL statement to set the role
+ * @throws Error if the role name is invalid
+ */
 function getCustomRoleImpersonationSql(roleName: string) {
-  return /* SQL */ `
-    set local role '${roleName}';
-  `.trim()
+  // Validate the role name before using it in SQL
+  const validation = validateRoleName(roleName)
+  if (!validation.valid) {
+    throw new Error(`Invalid role name for impersonation: ${validation.error}`)
+  }
+
+  // Use the sanitized SQL generation function
+  return createSetRoleSql(roleName)
 }
 
 export type RoleImpersonationState = Pick<ValtioRoleImpersonationState, 'role' | 'claims'>
