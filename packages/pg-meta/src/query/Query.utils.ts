@@ -278,6 +278,9 @@ function filterLiteral(value: any) {
   if (typeof value === 'string') {
     if (value?.startsWith('ARRAY[') && value?.endsWith(']')) {
       return value
+    } else if (value?.startsWith('(') && value?.endsWith(')')) {
+      // Allow parenthesized expressions for subquery filters
+      return value
     } else {
       return literal(value)
     }
